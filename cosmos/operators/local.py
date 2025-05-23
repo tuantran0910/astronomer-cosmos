@@ -178,6 +178,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         install_deps: bool = True,
         copy_dbt_packages: bool = settings.default_copy_dbt_packages,
         manifest_filepath: str = "",
+        dbt_packages_path: Path | None = None,
         callback: Callable[[str], None] | list[Callable[[str], None]] | None = None,
         callback_args: dict[str, Any] | None = None,
         should_store_compiled_sql: bool = True,
@@ -210,6 +211,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         self.copy_dbt_packages = copy_dbt_packages
 
         self.manifest_filepath = manifest_filepath
+        self.dbt_packages_path = dbt_packages_path
 
     @cached_property
     def subprocess_hook(self) -> FullOutputSubprocessHook:
@@ -472,10 +474,7 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         )
         if self.copy_dbt_packages:
             self.log.info("Copying dbt packages to temporary folder.")
-            dbt_packages_path = (
-                getattr(self.project_config, "dbt_packages_path", None) if hasattr(self, "project_config") else None
-            )
-            copy_dbt_packages(Path(self.project_dir), tmp_dir_path, custom_dbt_packages_path=dbt_packages_path)
+            copy_dbt_packages(Path(self.project_dir), tmp_dir_path, custom_dbt_packages_path=self.dbt_packages_path)
             self.log.info("Completed copying dbt packages to temporary folder.")
 
         copy_manifest_file_if_exists(self.manifest_filepath, Path(tmp_dir_path))
