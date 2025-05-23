@@ -39,6 +39,7 @@ from cosmos.constants import (
     _AIRFLOW3_MAJOR_VERSION,
     DBT_DEPENDENCIES_FILE_NAMES,
     FILE_SCHEME_AIRFLOW_DEFAULT_CONN_ID_MAP,
+    DBT_DEFAULT_PACKAGES_FOLDER,
     InvocationMode,
 )
 from cosmos.dataset import get_dataset_alias_name
@@ -47,6 +48,7 @@ from cosmos.dbt.project import (
     copy_manifest_file_if_exists,
     get_partial_parse_path,
     has_non_empty_dependencies_file,
+    check_dbt_packages_exists,
 )
 from cosmos.exceptions import AirflowCompatibilityError, CosmosDbtRunError, CosmosValueError
 from cosmos.settings import (
@@ -466,11 +468,23 @@ class AbstractDbtLocalBase(AbstractDbtBase):
             tmp_dir_path,
             self.project_dir,
         )
+
+        dbt_packages_exists = check_dbt_packages_exists(Path(self.project_dir))
+        if self.copy_dbt_packages and not dbt_packages_exists:
+            self.log.warning(
+                "copy_dbt_packages is enabled but %s directory doesn't exist in %s. "
+                "Will install dependencies instead.", 
+                DBT_DEFAULT_PACKAGES_FOLDER, self.project_dir
+            )
+            self.copy_dbt_packages = False
+            if has_non_empty_dependencies_file(Path(self.project_dir)):
+                self.install_deps = True
+
         should_not_create_dbt_deps_symbolic_link = self.install_deps or self.copy_dbt_packages
         create_symlinks(
             Path(self.project_dir), tmp_dir_path, ignore_dbt_packages=should_not_create_dbt_deps_symbolic_link
         )
-        if self.copy_dbt_packages:
+        if self.copy_dbt_packages and dbt_packages_exists:
             self.log.info("Copying dbt packages to temporary folder.")
             copy_dbt_packages(Path(self.project_dir), tmp_dir_path)
             self.log.info("Completed copying dbt packages to temporary folder.")

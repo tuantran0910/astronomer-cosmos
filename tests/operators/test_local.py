@@ -1710,7 +1710,9 @@ def test_read_run_sql_from_target_dir():
 
 @patch("cosmos.operators.local.copy_dbt_packages")
 @patch("cosmos.operators.local.create_symlinks")
-def test_test_clone_project(create_symlinks_mock, copy_dbt_packages_mock, caplog):
+@patch("cosmos.operators.local.check_dbt_packages_exists")
+def test_test_clone_project(check_dbt_packages_exists_mock, create_symlinks_mock, copy_dbt_packages_mock, caplog):
+    check_dbt_packages_exists_mock.return_value = False
     project_dir = Path("/fake/project")
     tmp_dir_path = Path("/fake/tmp")
     operator = DbtRunLocalOperator(
@@ -1722,12 +1724,10 @@ def test_test_clone_project(create_symlinks_mock, copy_dbt_packages_mock, caplog
     )
     operator._clone_project(tmp_dir_path)
 
-    create_symlinks_mock.assert_called_once_with(project_dir, tmp_dir_path, ignore_dbt_packages=True)
-    copy_dbt_packages_mock.assert_called_once_with(project_dir, tmp_dir_path)
+    create_symlinks_mock.assert_called_once_with(project_dir, tmp_dir_path, ignore_dbt_packages=False)
 
-    assert f"Cloning project to writable temp directory {tmp_dir_path} from {project_dir}" in caplog.text
-    assert "Copying dbt packages to temporary folder." in caplog.text
-    assert "Completed copying dbt packages to temporary folder." in caplog.text
+    assert "copy_dbt_packages is enabled but dbt_packages directory doesn't exist" in caplog.text
+    assert operator.copy_dbt_packages is False
 
 
 @patch("cosmos.operators.local.AbstractDbtLocalBase.store_freshness_json")
@@ -1832,9 +1832,7 @@ def test_upload_sql_files_creates_parent_directories(mock_object_storage_path):
         operator, "_configure_remote_target_path", return_value=("dest/dir", "mock_conn_id")
     ), patch.object(operator, "_construct_dest_file_path", return_value="dest/path/file.sql"), patch(
         "pathlib.Path.rglob", return_value=[Path("file.sql")]
-    ), patch(
-        "pathlib.Path.is_file", return_value=True
-    ):
+    ), patch("pathlib.Path.is_file", return_value=True):
         mock_dest_path = MagicMock()
         mock_dest_path.parent = MagicMock()
         mock_object_storage_path.return_value = mock_dest_path
@@ -1920,3 +1918,85 @@ def test_delete_sql_files_no_remote_target_configured(mock_configure_remote):
     with patch.object(operator.log, "warning") as mock_log_warning:
         operator._delete_sql_files()
         mock_log_warning.assert_called_once_with(expected_log_message)
+
+
+@patch("cosmos.operators.local.check_dbt_packages_exists")
+@patch("cosmos.operators.local.create_symlinks")
+@patch("cosmos.operators.local.copy_dbt_packages")
+def test_clone_project_no_dbt_packages(
+    mock_copy_dbt_packages, mock_create_symlinks, mock_check_dbt_packages_exists, caplog
+):
+    """Test that when copy_dbt_packages is True but the dbt_packages directory doesn't exist, it logs a warning and enables install_deps."""
+    mock_check_dbt_packages_exists.return_value = False
+
+    operator = DbtRunLocalOperator(
+        profile_config=profile_config,
+        task_id="test-task",
+        project_dir="test/dir",
+        copy_dbt_packages=True,
+        install_deps=False,
+    )
+
+    with patch("cosmos.operators.local.has_non_empty_dependencies_file", return_value=True):
+        operator._clone_project(Path("/tmp/project_dir"))
+
+    assert "copy_dbt_packages is enabled but dbt_packages directory doesn't exist" in caplog.text
+    assert operator.copy_dbt_packages is False
+    assert operator.install_deps is True
+
+    mock_create_symlinks.assert_called_once_with(Path("test/dir"), Path("/tmp/project_dir"), ignore_dbt_packages=True)
+    mock_copy_dbt_packages.assert_not_called()
+
+
+@patch("cosmos.operators.local.check_dbt_packages_exists")
+@patch("cosmos.operators.local.create_symlinks")
+@patch("cosmos.operators.local.copy_dbt_packages")
+def test_clone_project_no_dbt_packages_no_deps_file(
+    mock_copy_dbt_packages, mock_create_symlinks, mock_check_dbt_packages_exists, caplog
+):
+    """Test that when copy_dbt_packages is True but the dbt_packages directory doesn't exist and there's no deps file, install_deps remains False."""
+    mock_check_dbt_packages_exists.return_value = False
+
+    operator = DbtRunLocalOperator(
+        profile_config=profile_config,
+        task_id="test-task",
+        project_dir="test/dir",
+        copy_dbt_packages=True,
+        install_deps=False,
+    )
+
+    with patch("cosmos.operators.local.has_non_empty_dependencies_file", return_value=False):
+        operator._clone_project(Path("/tmp/project_dir"))
+
+    assert "copy_dbt_packages is enabled but dbt_packages directory doesn't exist" in caplog.text
+    assert operator.copy_dbt_packages is False
+    assert operator.install_deps is False
+
+    mock_create_symlinks.assert_called_once_with(Path("test/dir"), Path("/tmp/project_dir"), ignore_dbt_packages=False)
+    mock_copy_dbt_packages.assert_not_called()
+
+
+@patch("cosmos.operators.local.check_dbt_packages_exists")
+@patch("cosmos.operators.local.create_symlinks")
+@patch("cosmos.operators.local.copy_dbt_packages")
+def test_clone_project_with_dbt_packages(
+    mock_copy_dbt_packages, mock_create_symlinks, mock_check_dbt_packages_exists, caplog
+):
+    """Test that when copy_dbt_packages is True and the dbt_packages directory exists, it copies the packages."""
+    mock_check_dbt_packages_exists.return_value = True
+
+    operator = DbtRunLocalOperator(
+        profile_config=profile_config,
+        task_id="test-task",
+        project_dir="test/dir",
+        copy_dbt_packages=True,
+        install_deps=False,
+    )
+    operator._clone_project(Path("/tmp/project_dir"))
+
+    assert "copy_dbt_packages is enabled but dbt_packages directory doesn't exist" not in caplog.text
+    assert operator.copy_dbt_packages is True
+    assert operator.install_deps is False
+
+    mock_create_symlinks.assert_called_once_with(Path("test/dir"), Path("/tmp/project_dir"), ignore_dbt_packages=True)
+    mock_copy_dbt_packages.assert_called_once_with(Path("test/dir"), Path("/tmp/project_dir"))

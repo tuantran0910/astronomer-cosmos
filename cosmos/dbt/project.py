@@ -93,6 +93,15 @@ def copy_dbt_packages(source_folder: Path, target_folder: Path) -> None:
     logger.info("Completed copying dbt packages to temporary folder.")
 
 
+def check_dbt_packages_exists(project_path: Path) -> bool:
+    """
+    Check if the dbt project has a dbt_packages directory.
+    """
+    dbt_packages_folder = get_dbt_packages_subpath(project_path)
+    dbt_packages_path = project_path / dbt_packages_folder
+    return dbt_packages_path.exists() and dbt_packages_path.is_dir()
+
+
 def copy_manifest_file_if_exists(source_manifest: str | Path, dbt_project_folder: str | Path) -> None:
     """
     Copies the source manifest.json file, if available, to the given desired dbt project folder.

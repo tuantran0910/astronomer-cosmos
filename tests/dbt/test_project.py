@@ -14,6 +14,7 @@ from cosmos.dbt.project import (
     environ,
     get_dbt_packages_subpath,
     has_non_empty_dependencies_file,
+    check_dbt_packages_exists,
 )
 
 DBT_PROJECTS_ROOT_DIR = Path(__file__).parent.parent.parent / "dev/dags/dbt"
@@ -160,3 +161,33 @@ def test_copy_dbt_packages_all_cases(mock_logger, mock_dir, mock_makedirs, mock_
 
     mock_logger.info.assert_any_call("Copying dbt packages to temporary folder...")
     mock_logger.info.assert_any_call("Completed copying dbt packages to temporary folder.")
+
+
+def test_check_dbt_packages_exists(tmpdir):
+    """Test that check_dbt_packages_exists returns True when the directory exists."""
+    project_dir = Path(tmpdir)
+    packages_dir = project_dir / DBT_DEFAULT_PACKAGES_FOLDER
+    packages_dir.mkdir()
+
+    assert check_dbt_packages_exists(project_dir) is True
+
+
+def test_check_dbt_packages_exists_false(tmpdir):
+    """Test that check_dbt_packages_exists returns False when the directory doesn't exist."""
+    project_dir = Path(tmpdir)
+
+    assert check_dbt_packages_exists(project_dir) is False
+
+
+def test_check_dbt_packages_exists_with_custom_path(tmpdir):
+    """Test that check_dbt_packages_exists checks the custom path if specified in dbt_project.yml."""
+    project_dir = Path(tmpdir)
+    custom_packages_dir = project_dir / "custom_packages"
+    custom_packages_dir.mkdir()
+
+    # Create dbt_project.yml with custom packages-install-path
+    with open(project_dir / "dbt_project.yml", "w") as f:
+        yaml.dump({"packages-install-path": "custom_packages"}, f)
+
+    with patch("cosmos.dbt.project.get_dbt_packages_subpath", return_value="custom_packages"):
+        assert check_dbt_packages_exists(project_dir) is True
