@@ -472,7 +472,10 @@ class AbstractDbtLocalBase(AbstractDbtBase):
         )
         if self.copy_dbt_packages:
             self.log.info("Copying dbt packages to temporary folder.")
-            copy_dbt_packages(Path(self.project_dir), tmp_dir_path)
+            dbt_packages_path = (
+                getattr(self.project_config, "dbt_packages_path", None) if hasattr(self, "project_config") else None
+            )
+            copy_dbt_packages(Path(self.project_dir), tmp_dir_path, custom_dbt_packages_path=dbt_packages_path)
             self.log.info("Completed copying dbt packages to temporary folder.")
 
         copy_manifest_file_if_exists(self.manifest_filepath, Path(tmp_dir_path))
