@@ -305,6 +305,7 @@ class DbtToAirflowConverter:
             "vars": dbt_vars,
             "cache_dir": cache_dir,
             "manifest_filepath": project_config.manifest_path,
+            "dbt_packages_path": project_config.dbt_packages_path,
         }
 
         validate_arguments(
