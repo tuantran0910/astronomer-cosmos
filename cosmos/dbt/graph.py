@@ -702,7 +702,7 @@ class DbtGraph:
         create_symlinks(source_dir_path, dest_dir_path, ignore_dbt_packages=should_not_create_dbt_deps_symbolic_link)
 
         if self.project.copy_dbt_packages:
-            copy_dbt_packages(source_dir_path, dest_dir_path)
+            copy_dbt_packages(source_dir_path, dest_dir_path, custom_dbt_packages_path=self.project.dbt_packages_path)
 
     def load_via_dbt_ls_without_cache(self) -> None:
         """

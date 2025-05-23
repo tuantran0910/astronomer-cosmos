@@ -67,28 +67,39 @@ def get_dbt_packages_subpath(source_folder: Path) -> str:
     return subpath
 
 
-def copy_dbt_packages(source_folder: Path, target_folder: Path) -> None:
+def copy_dbt_packages(source_folder: Path, target_folder: Path, custom_dbt_packages_path: Path | None = None) -> None:
     """
     Copies the dbt packages related files and directories from source_folder to target_folder.
 
     :param source_folder: The base directory where paths are sourced from.
     :param target_folder: The directory where paths will be copied to.
+    :param custom_dbt_packages_path: Optional path to a custom dbt_packages directory to use instead of the one in source_folder.
     """
     logger.info("Copying dbt packages to temporary folder...")
 
-    dbt_packages_folder = get_dbt_packages_subpath(source_folder)
-    dbt_packages_paths = [dbt_packages_folder, PACKAGE_LOCKFILE_YML]
+    src_package_lockfile_path = source_folder / PACKAGE_LOCKFILE_YML
+    dst_package_lockfile_path = target_folder / PACKAGE_LOCKFILE_YML
+    os.makedirs(os.path.dirname(dst_package_lockfile_path), exist_ok=True)
 
-    for relative_path in dbt_packages_paths:
-        src_path = source_folder / relative_path
-        dst_path = target_folder / relative_path
-
-        os.makedirs(os.path.dirname(dst_path), exist_ok=True)
-
-        if src_path.is_dir():
-            shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
+    if src_package_lockfile_path.exists():
+        if os.path.isdir(src_package_lockfile_path):
+            shutil.copytree(src_package_lockfile_path, dst_package_lockfile_path, dirs_exist_ok=True)
         else:
-            shutil.copy2(src_path, dst_path)
+            shutil.copy2(src_package_lockfile_path, dst_package_lockfile_path)
+
+    # Handle dbt_packages directory
+    dbt_packages_folder = get_dbt_packages_subpath(source_folder)
+    if custom_dbt_packages_path:
+        logger.info(f"Using custom dbt_packages path: {custom_dbt_packages_path}")
+        src_packages_path = custom_dbt_packages_path
+    else:
+        logger.info(f"Using default dbt_packages path: {dbt_packages_folder}")
+        src_packages_path = source_folder / dbt_packages_folder
+
+    dst_packages_path = target_folder / dbt_packages_folder
+    if src_packages_path.exists() and os.path.isdir(src_packages_path):
+        os.makedirs(os.path.dirname(dst_packages_path), exist_ok=True)
+        shutil.copytree(src_packages_path, dst_packages_path, dirs_exist_ok=True)
 
     logger.info("Completed copying dbt packages to temporary folder.")
 

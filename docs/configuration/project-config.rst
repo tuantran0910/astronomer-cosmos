@@ -26,6 +26,7 @@ variables that should be used for rendering and execution. It takes the followin
   env vars is only supported when using ``RenderConfig.LoadMode.DBT_LS`` load mode.
 - ``install_dbt_deps``: (new in v1.9) Run dbt deps during DAG parsing and task execution if True (default).
 - ``copy_dbt_packages``: (new in v1.10) Copy the dbt project ``dbt_packages`` instead of creating symbolic links, so Cosmos can run ``dbt deps`` incrementally.
+- ``dbt_packages_path``: (new in v1.11) The path to an existing dbt_packages directory that will be copied to the temporary directory when running dbt. If not provided, the dbt_packages directory within the dbt_project_path will be used.
 - ``partial_parse``: (new in v1.4) If True, then attempt to use the ``partial_parse.msgpack`` if it exists. This is only used
   for the ``LoadMode.DBT_LS`` load mode, and for the ``ExecutionMode.LOCAL`` and ``ExecutionMode.VIRTUALENV``
   execution modes. Due to the way that dbt `partial parsing works <https://docs.getdbt.com/reference/parsing#known-limitations>`_, it does not work with Cosmos profile mapping classes. To benefit from this feature, users have to set the ``profiles_yml_filepath`` argument in ``ProfileConfig``.
